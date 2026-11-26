@@ -2,9 +2,14 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from tools import validate as v
+
+
+SCHEMA = Path(__file__).resolve().parents[1] / "schemas/agent.schema.json"
 
 
 def example():
@@ -38,17 +43,43 @@ class DataTests(unittest.TestCase):
             v.manifest(dict(example(), schema_version=True), "alice--bot", "alice")
 
     def test_integral_version(self):
-        v.manifest(dict(example(), schema_version=1.0), "alice--bot", "alice")
+        raw = json.dumps(dict(example(), schema_version=1.0)).encode()
+        v.manifest(v.parse(raw), "alice--bot", "alice")
 
-    def test_schema_slug_limit(self):
-        for length in (40, 41):
-            agent_id = "alice--" + "a" * length
-            data = dict(example(), agent_id=agent_id)
-            if length == 40:
-                v.manifest(data, agent_id, "alice")
-            else:
-                with self.assertRaises(v.Invalid):
-                    v.manifest(data, agent_id, "alice")
+    def test_fractional_version_does_not_round_to_one(self):
+        raw = json.dumps(example()).replace('"schema_version": 1',
+                                           '"schema_version": 1.0000000000000001').encode()
+        with self.assertRaises(v.Invalid):
+            v.manifest(v.parse(raw), "alice--bot", "alice")
+
+    def test_manifest_patterns_reject_trailing_line_breaks(self):
+        patterns = json.loads(SCHEMA.read_text())["properties"]
+        for field in ("agent_id", "operator", "name", "runtime"):
+            for ending in ("\n", "\r", "\r\n", "\u2028", "\u2029"):
+                with self.subTest(field=field, ending=ending):
+                    data = example()
+                    data[field] += ending
+                    self.assertNotRegex(data[field], patterns[field]["pattern"])
+                    with self.assertRaises(v.Invalid):
+                        v.manifest(data, data["agent_id"], data["operator"])
+
+    def test_manifest_operator_and_slug_lengths(self):
+        pattern = json.loads(SCHEMA.read_text())["properties"]["agent_id"]["pattern"]
+        for operator_length, slug_length, valid in (
+            (1, 1, True), (39, 40, True), (40, 1, False), (1, 41, False),
+            (0, 1, False), (1, 0, False),
+        ):
+            with self.subTest(operator=operator_length, slug=slug_length):
+                operator = "a" * operator_length
+                agent_id = operator + "--" + "x" * slug_length
+                data = dict(example(), agent_id=agent_id, operator=operator)
+                if valid:
+                    self.assertRegex(agent_id, pattern)
+                    v.manifest(data, agent_id, operator)
+                else:
+                    self.assertNotRegex(agent_id, pattern)
+                    with self.assertRaises(v.Invalid):
+                        v.manifest(data, agent_id, operator)
 
     def test_namespace(self):
         with self.assertRaises(v.Invalid):
@@ -112,6 +143,24 @@ class GitTests(unittest.TestCase):
         with self.assertRaises(v.Invalid):
             v.validate(first, self.commit(), "alice")
 
+    def test_base_path_is_a_directory(self):
+        head = self.registration()
+        self.git("checkout", "-qb", "advanced-base", self.base)
+        self.write("agents/alice--bot.json/file.json", {})
+        with self.assertRaises(v.Invalid):
+            v.validate(self.commit(), head, "alice")
+
+    def test_base_parent_is_a_file(self):
+        registered = self.registration()
+        self.write("submissions/alice--bot/normalize-001.json",
+                   {"schema_version": 1, "agent_id": "alice--bot",
+                    "challenge_id": "normalize-001", "answer": v.EXPECTED})
+        head = self.commit()
+        self.git("checkout", "-qb", "advanced-base", registered)
+        self.write("submissions/alice--bot", {})
+        with self.assertRaises(v.Invalid):
+            v.validate(self.commit(), head, "alice")
+
     def test_symlink(self):
         Path("agents").mkdir()
         Path("agents/alice--bot.json").symlink_to("../README.md")
@@ -151,8 +200,6 @@ class GitTests(unittest.TestCase):
         self.assertTrue(v.validate(first, self.commit(), "bob").startswith("PASS"))
 
     def test_manual_proposal_cli_exit(self):
-        import sys
-        from unittest.mock import patch
         Path("README.md").write_text("changed")
         head = self.commit()
         with patch.object(sys, "argv", ["validate", "--base", self.base, "--head", head,
@@ -160,8 +207,32 @@ class GitTests(unittest.TestCase):
             self.assertEqual(v.main(), 2)
 
     def test_diff_output_bound(self):
-        from unittest.mock import patch
         head = self.registration()
         with patch.object(v, "MAX_DIFF_BYTES", 8):
             with self.assertRaises(v.Invalid):
                 v.validate(self.base, head, "alice")
+
+    def test_diff_read_timeout_fails_closed(self):
+        popen = subprocess.Popen
+        for close_stdout in (False, True):
+            with self.subTest(close_stdout=close_stdout):
+                script = "import os, time; "
+                if close_stdout:
+                    script += "os.close(1); "
+                script += "time.sleep(1)"
+
+                def start_silent_process(args, **kwargs):
+                    return popen([sys.executable, "-c", script], **kwargs)
+
+                with patch.object(v, "GIT_TIMEOUT", 0.2, create=True), patch.object(
+                    v.subprocess, "Popen", side_effect=start_silent_process
+                ):
+                    with self.assertRaises(subprocess.TimeoutExpired):
+                        v.bounded_diff(self.base, self.base)
+
+    def test_timeout_cli_exit(self):
+        args = ["validate", "--base", self.base, "--head", self.base, "--author", "alice"]
+        with patch.object(sys, "argv", args), patch.object(
+            v, "bounded_diff", side_effect=subprocess.TimeoutExpired("git", 30)
+        ):
+            self.assertEqual(v.main(), 1)

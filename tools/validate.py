@@ -1,12 +1,19 @@
 """Validate one playground contribution using Git objects, not a PR checkout."""
 import argparse
+from concurrent.futures import Future
+from decimal import Decimal, InvalidOperation
 import json
+import os
 import re
+import signal
 import subprocess
 import sys
+from threading import Thread
+from time import monotonic
 
 MAX_BYTES = 4096
 MAX_DIFF_BYTES = 65536
+GIT_TIMEOUT = 30
 SLUG = r"[a-z0-9]+(?:-[a-z0-9]+)*"
 ID = SLUG + r"--" + SLUG
 CAPABILITIES = {
@@ -39,8 +46,11 @@ def reject_constant(_):
 
 def parse(raw):
     require(len(raw) <= MAX_BYTES, "JSON exceeds size limit")
-    data = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_object,
-                      parse_constant=reject_constant)
+    try:
+        data = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_object,
+                          parse_float=Decimal, parse_constant=reject_constant)
+    except InvalidOperation:
+        raise Invalid("unsupported JSON number") from None
     require(type(data) is dict, "JSON object required")
     return data
 
@@ -51,7 +61,7 @@ def matches(value, pattern, limit):
 
 def fields(data, keys):
     require(set(data) == set(keys), "missing or unexpected fields")
-    require(type(data["schema_version"]) in (int, float) and data["schema_version"] == 1,
+    require(type(data["schema_version"]) in (int, float, Decimal) and data["schema_version"] == 1,
             "unsupported schema version")
 
 
@@ -77,24 +87,49 @@ def solution(data, agent_id):
     require(data["answer"] == EXPECTED, "incorrect challenge result")
 
 
-def git(*args):
-    return subprocess.check_output(["git", "--literal-pathspecs", *args],
-                                   stderr=subprocess.DEVNULL, timeout=30)
+def git(*args, limit=MAX_DIFF_BYTES):
+    command = ["git", "--literal-pathspecs", *args]
+    deadline = monotonic() + GIT_TIMEOUT
+    grouped = os.name == "posix"
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                            start_new_session=grouped)
+    output = Future()
+
+    def read_output():
+        # Keep the blocking pipe read off the thread enforcing the deadline.
+        try:
+            with proc.stdout:
+                raw = proc.stdout.read(limit + 1)
+        except OSError as exc:
+            output.set_exception(exc)
+        else:
+            output.set_result(raw)
+
+    try:
+        Thread(target=read_output, daemon=True).start()
+        try:
+            raw = output.result(timeout=max(0, deadline - monotonic()))
+        except TimeoutError:
+            raise subprocess.TimeoutExpired(command, GIT_TIMEOUT) from None
+        require(len(raw) <= limit, "git output exceeds size limit")
+        require(proc.wait(timeout=max(0, deadline - monotonic())) == 0, "git command failed")
+        return raw
+    finally:
+        if proc.returncode is None:
+            # Git may launch a fetch helper during a partial-clone object read.
+            try:
+                if grouped:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                else:
+                    proc.kill()
+            except ProcessLookupError:
+                pass
+            proc.wait(timeout=1)
 
 
 def bounded_diff(ancestor, head):
-    args = ["git", "--literal-pathspecs", "diff", "--no-ext-diff", "--no-renames",
-            "--name-status", "-z", ancestor, head, "--"]
-    with subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL) as proc:
-        try:
-            raw = proc.stdout.read(MAX_DIFF_BYTES + 1)
-            require(len(raw) <= MAX_DIFF_BYTES, "diff exceeds size limit")
-            require(proc.wait(timeout=30) == 0, "git diff failed")
-            return raw
-        finally:
-            if proc.poll() is None:
-                proc.kill()
-                proc.wait()
+    return git("diff", "--no-ext-diff", "--no-renames", "--name-status", "-z",
+               ancestor, head, "--", limit=MAX_DIFF_BYTES)
 
 
 def resolve(ref):
@@ -103,7 +138,7 @@ def resolve(ref):
     return sha
 
 
-def entry(commit, path):
+def tree_entry(commit, path):
     raw = git("ls-tree", "-z", commit, "--", path)
     if not raw:
         return None
@@ -111,16 +146,26 @@ def entry(commit, path):
     meta, name = raw[:-1].split(b"\t", 1)
     require(name == path.encode(), "tree path mismatch")
     mode, kind, sha = meta.decode("ascii").split()
-    require(mode == "100644" and kind == "blob", "regular non-executable file required")
-    require(re.fullmatch(r"[a-f0-9]{40}", sha) is not None, "invalid blob")
-    return sha
+    require(re.fullmatch(r"[a-f0-9]{40}", sha) is not None, "invalid object ID")
+    return mode, kind, sha
+
+
+def require_new_path(base, path):
+    require(tree_entry(base, path) is None, "path already exists on current base")
+    while "/" in path:
+        path = path.rsplit("/", 1)[0]
+        parent = tree_entry(base, path)
+        require(parent is None or parent[:2] == ("040000", "tree"),
+                "parent path is not a directory on current base")
 
 
 def read_json(commit, path):
-    sha = entry(commit, path)
-    require(sha is not None, "required file not found")
+    found = tree_entry(commit, path)
+    require(found is not None, "required file not found")
+    mode, kind, sha = found
+    require(mode == "100644" and kind == "blob", "regular non-executable file required")
     require(int(git("cat-file", "-s", sha)) <= MAX_BYTES, "JSON exceeds size limit")
-    return parse(git("cat-file", "blob", sha))
+    return parse(git("cat-file", "blob", sha, limit=MAX_BYTES))
 
 
 def validate(base_ref, head_ref, author, allow_proposals=False):
@@ -141,7 +186,7 @@ def validate(base_ref, head_ref, author, allow_proposals=False):
     reg = re.fullmatch(r"agents/(" + ID + r")\.json", path)
     sub = re.fullmatch(r"submissions/(" + ID + r")/normalize-001\.json", path)
     require(reg is not None or sub is not None, "unsupported contribution path")
-    require(entry(base, path) is None, "path already exists on current base")
+    require_new_path(base, path)
     data = read_json(head, path)
     if reg:
         manifest(data, reg.group(1), author)

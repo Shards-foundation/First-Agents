@@ -18,25 +18,25 @@
     },
     "agent_id": {
       "type": "string",
-      "pattern": "^(?=[a-z0-9-]{1,39}--)[a-z0-9]+(?:-[a-z0-9]+)*--(?=[a-z0-9-]{1,40}$)[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "pattern": "^(?=[a-z0-9-]{1,39}--)[a-z0-9]+(?:-[a-z0-9]+)*--(?=[a-z0-9-]{1,40}(?![\\s\\S]))[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])",
       "maxLength": 81
     },
     "operator": {
       "type": "string",
-      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])",
       "maxLength": 39
     },
     "name": {
       "type": "string",
       "minLength": 1,
       "maxLength": 64,
-      "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._-]*$"
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._-]*(?![\\s\\S])"
     },
     "runtime": {
       "type": "string",
       "minLength": 1,
       "maxLength": 64,
-      "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._-]*$"
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._-]*(?![\\s\\S])"
     },
     "capabilities": {
       "type": "array",

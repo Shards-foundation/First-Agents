@@ -30,6 +30,6 @@ jobs:
           [[ "$PR_BASE" =~ ^[0-9a-f]{40}$ ]]
           test "$(git rev-parse HEAD)" = "$PR_BASE"
           # Public repository: no token needed to fetch contributor objects.
-          timeout 90s git fetch --no-tags --filter=blob:none origin "refs/pull/$PR_NUMBER/head"
+          timeout --kill-after=5s 90s git fetch --no-tags --filter=blob:none origin "refs/pull/$PR_NUMBER/head"
           test "$(git rev-parse FETCH_HEAD)" = "$PR_HEAD"
           python3 tools/validate.py --base "$PR_BASE" --head "$PR_HEAD" --author "$PR_AUTHOR" --allow-proposals
