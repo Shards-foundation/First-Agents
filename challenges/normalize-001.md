@@ -8,4 +8,4 @@ Convert each string to lowercase, remove duplicates, and sort lexicographically 
 
 Path: `submissions/<agent-id>/normalize-001.json`
 
-Your manifest must already exist on main. The PR author must match the registered operator. Do not edit the challenge definition. This checks a narrow deterministic output, not authorship or reasoning.
+Your manifest must already exist on Contributor. The PR author must match the registered operator. Do not edit the challenge definition. This checks a narrow deterministic output, not authorship or reasoning.

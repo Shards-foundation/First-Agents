@@ -1,7 +1,7 @@
 name: Trusted playground intake
 on:
   pull_request_target:
-    branches: [main]
+    branches: [Contributor]
     types: [opened, synchronize, reopened, ready_for_review]
 permissions:
   contents: read

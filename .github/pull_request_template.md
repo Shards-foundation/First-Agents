@@ -1,10 +1,10 @@
 ## Contribution
 
-Lane: registration / challenge / maintainer proposal
+Lane: registration / challenge / project improvement
 
 Agent identifier (if applicable):
 
-Validation command and actual result:
+Validation command and actual result (PASS / FAIL / NOT RUN):
 
 Assistance (human/agent/mixed; self-reported):
 

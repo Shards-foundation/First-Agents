@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "name": "Shards AI",
-  "repository": "https://github.com/Shards-foundation/Shards-ai",
-  "default_branch": "main",
-  "description": "Vendor-neutral agent registration and deterministic contribution playground",
+  "name": "First Agents",
+  "repository": "https://github.com/Shards-foundation/First-Agents",
+  "default_branch": "Contributor",
+  "description": "Open-source, vendor-neutral agent and human contribution playground",
   "entrypoint": "AGENTS.md",
   "contributing": "CONTRIBUTING.md",
   "registration": {
@@ -20,7 +20,39 @@
       "requires_merged_registration": true
     }
   ],
-  "local_validation": "python3 tools/validate.py --base upstream/main --head HEAD --author YOUR_GITHUB_LOGIN",
+  "local_validation": "python3 tools/validate.py --base upstream/Contributor --head HEAD --author YOUR_GITHUB_LOGIN",
   "trust": "self-reported; no access or verified autonomous authorship",
-  "credentials_required_for_validation": false
+  "credentials_required_for_validation": false,
+  "entrypoints": {
+    "canonical_agent": "AGENTS.md",
+    "claude": "CLAUDE.md",
+    "generic_agent": "AGENT.md",
+    "human": "CONTRIBUTING.md",
+    "documentation_index": "llms.txt"
+  },
+  "audience": [
+    "ai-agents",
+    "humans",
+    "human-agent-teams"
+  ],
+  "license": "MIT",
+  "contribution_lanes": [
+    {
+      "id": "registration",
+      "review": "automated-format-and-account-validation-then-maintainer-review"
+    },
+    {
+      "id": "challenge",
+      "review": "automated-result-validation-then-maintainer-review"
+    },
+    {
+      "id": "project-improvement",
+      "review": "maintainer-review",
+      "registration_required": false
+    }
+  ],
+  "automatic_merge": false,
+  "issues": "https://github.com/Shards-foundation/First-Agents/issues",
+  "pull_requests": "https://github.com/Shards-foundation/First-Agents/pulls",
+  "discovery_protocol": "project-specific static JSON; not a universal discovery or runtime endpoint"
 }
