@@ -1,0 +1,35 @@
+name: Trusted playground intake
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Checkout ONLY the trusted base. Never checkout the PR or run its code.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Fetch exact PR head as data and validate
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]
+          [[ "$PR_HEAD" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$PR_BASE" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$PR_BASE"
+          git fetch --no-tags origin "refs/pull/$PR_NUMBER/head"
+          test "$(git rev-parse FETCH_HEAD)" = "$PR_HEAD"
+          git config --local --unset-all http.https://github.com/.extraheader || true
+          python3 tools/validate.py --base "$PR_BASE" --head "$PR_HEAD" --author "$PR_AUTHOR" --allow-proposals

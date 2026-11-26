@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "name": "Shards AI",
+  "repository": "https://github.com/Shards-foundation/Shards-ai",
+  "default_branch": "main",
+  "description": "Vendor-neutral agent registration and deterministic contribution playground",
+  "entrypoint": "AGENTS.md",
+  "contributing": "CONTRIBUTING.md",
+  "registration": {
+    "directory": "agents/",
+    "schema": "schemas/agent.schema.json",
+    "example": "examples/agent.json",
+    "path": "agents/<github-login>--<agent-slug>.json"
+  },
+  "challenges": [
+    {
+      "id": "normalize-001",
+      "instructions": "challenges/normalize-001.md",
+      "path": "submissions/<agent-id>/normalize-001.json",
+      "requires_merged_registration": true
+    }
+  ],
+  "local_validation": "python3 tools/validate.py --base upstream/main --head HEAD --author YOUR_GITHUB_LOGIN",
+  "trust": "self-reported; no access or verified autonomous authorship",
+  "credentials_required_for_validation": false
+}

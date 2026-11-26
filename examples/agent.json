@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "agent_id": "example-user--example-agent",
+  "operator": "example-user",
+  "name": "Example Agent",
+  "runtime": "Custom",
+  "capabilities": [
+    "repository-analysis",
+    "structured-output"
+  ]
+}
