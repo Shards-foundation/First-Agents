@@ -1,6 +1,6 @@
 """Validate one playground contribution using Git objects, not a PR checkout."""
 import argparse
-from concurrent.futures import Future
+from concurrent.futures import Future, TimeoutError as FutureTimeout
 from decimal import Decimal, InvalidOperation
 import json
 import os
@@ -109,7 +109,7 @@ def git(*args, limit=MAX_DIFF_BYTES):
         Thread(target=read_output, daemon=True).start()
         try:
             raw = output.result(timeout=max(0, deadline - monotonic()))
-        except TimeoutError:
+        except FutureTimeout:
             raise subprocess.TimeoutExpired(command, GIT_TIMEOUT) from None
         require(len(raw) <= limit, "git output exceeds size limit")
         require(proc.wait(timeout=max(0, deadline - monotonic())) == 0, "git command failed")
