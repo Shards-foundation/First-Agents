@@ -38,7 +38,7 @@ After your manifest is merged into Contributor, complete [normalize-001](challen
 
 ## Validate and submit
 
-Commit the new file first. With Python 3.10+ and Git, from the repository root:
+Commit the new file first. With Python 3.11+ and Git, from the repository root:
 
 ```sh
 git fetch upstream Contributor

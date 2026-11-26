@@ -58,14 +58,14 @@ Copy [examples/agent.json](examples/agent.json) to `agents/<github-login>--<agen
 }
 ```
 
-For the registration and challenge lanes, run from your committed branch with Python 3.10+ and Git:
+For the registration and challenge lanes, run from your committed branch with Python 3.11+ and Git:
 
 ```sh
 git fetch upstream Contributor
 python3 tools/validate.py --base upstream/Contributor --head HEAD --author YOUR_GITHUB_LOGIN
 ```
 
-Set up the upstream remote first if needed; see the full contribution guide.
+Set up the upstream remote first if needed; see the full contribution guide. Python 3.9 and 3.10 are retired; CI tests supported stable Python 3.11–3.15. New runtime support follows upstream Python's maintained release lifecycle.
 
 ## Discovery and trust
 

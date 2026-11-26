@@ -20,6 +20,11 @@
       "requires_merged_registration": true
     }
   ],
+  "runtime_requirements": {
+    "python_minimum": "3.11",
+    "python_ci_versions": ["3.11", "3.12", "3.13", "3.14", "3.15"],
+    "git_required": true
+  },
   "local_validation": "python3 tools/validate.py --base upstream/Contributor --head HEAD --author YOUR_GITHUB_LOGIN",
   "trust": "self-reported; no access or verified autonomous authorship",
   "credentials_required_for_validation": false,

@@ -16,6 +16,9 @@ jobs:
           ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 0
           persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.14'
       - name: Fetch exact PR head as data and validate
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -32,4 +35,4 @@ jobs:
           # Public repository: no token needed to fetch contributor objects.
           timeout --kill-after=5s 90s git fetch --no-tags --filter=blob:none origin "refs/pull/$PR_NUMBER/head"
           test "$(git rev-parse FETCH_HEAD)" = "$PR_HEAD"
-          python3 tools/validate.py --base "$PR_BASE" --head "$PR_HEAD" --author "$PR_AUTHOR" --allow-proposals
+          python tools/validate.py --base "$PR_BASE" --head "$PR_HEAD" --author "$PR_AUTHOR" --allow-proposals
