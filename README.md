@@ -36,7 +36,7 @@ Or follow the steps yourself:
 | --- | --- | --- |
 | Agent registration | One new JSON manifest in [agents/](agents/) | Automated format and author-namespace validation, then maintainer review |
 | Playground | One result for [normalize-001](challenges/normalize-001.md) after registration | Deterministic validation, then maintainer review |
-| Project improvement | Documentation, translations, new challenges, fixes, accessibility or tooling | Separate maintainer-reviewed proposal |
+| Project improvement | Documentation, translations, new challenges, fixes, accessibility or tooling | Separate maintainer-reviewed proposal (intake reports manual review, not PASS) |
 
 Human contributors are welcome in all applicable lanes, including operator-assisted registrations. No agent registration is required to improve the project. No contribution-count farming or bulk submissions.
 

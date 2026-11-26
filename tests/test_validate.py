@@ -37,6 +37,19 @@ class DataTests(unittest.TestCase):
         with self.assertRaises(v.Invalid):
             v.manifest(dict(example(), schema_version=True), "alice--bot", "alice")
 
+    def test_integral_version(self):
+        v.manifest(dict(example(), schema_version=1.0), "alice--bot", "alice")
+
+    def test_schema_slug_limit(self):
+        for length in (40, 41):
+            agent_id = "alice--" + "a" * length
+            data = dict(example(), agent_id=agent_id)
+            if length == 40:
+                v.manifest(data, agent_id, "alice")
+            else:
+                with self.assertRaises(v.Invalid):
+                    v.manifest(data, agent_id, "alice")
+
     def test_namespace(self):
         with self.assertRaises(v.Invalid):
             v.manifest(dict(example(), agent_id="bob--bot"), "bob--bot", "alice")
@@ -125,3 +138,30 @@ class GitTests(unittest.TestCase):
         self.assertTrue(v.validate(self.base, head, "alice", True).startswith("MANUAL"))
         with self.assertRaises(v.Invalid):
             v.validate(self.base, head, "alice")
+
+    def test_registry_readme_proposal(self):
+        Path("agents").mkdir()
+        Path("agents/README.md").write_text("documentation")
+        self.assertTrue(v.validate(self.base, self.commit(), "alice", True).startswith("MANUAL"))
+
+    def test_concurrent_unrelated_registration(self):
+        first = self.registration()
+        self.git("checkout", "-qb", "other", self.base)
+        self.write("agents/bob--bot.json", dict(example(), operator="bob", agent_id="bob--bot"))
+        self.assertTrue(v.validate(first, self.commit(), "bob").startswith("PASS"))
+
+    def test_manual_proposal_cli_exit(self):
+        import sys
+        from unittest.mock import patch
+        Path("README.md").write_text("changed")
+        head = self.commit()
+        with patch.object(sys, "argv", ["validate", "--base", self.base, "--head", head,
+                                       "--author", "alice", "--allow-proposals"]):
+            self.assertEqual(v.main(), 2)
+
+    def test_diff_output_bound(self):
+        from unittest.mock import patch
+        head = self.registration()
+        with patch.object(v, "MAX_DIFF_BYTES", 8):
+            with self.assertRaises(v.Invalid):
+                v.validate(self.base, head, "alice")

@@ -30,7 +30,7 @@ Add exactly one new file:
 
 `agents/<lowercase-github-login>--<agent-slug>.json`
 
-Copy [examples/agent.json](examples/agent.json) and consult [schemas/agent.schema.json](schemas/agent.schema.json). Only documented keys are allowed. Use public aliases, not private information. Names and runtimes are plain text (ASCII letters, digits, spaces, dots, underscores and hyphens). Capabilities come from the allowed list. One account may register distinct genuine agent instances; do not spam or impersonate providers.
+Copy [examples/agent.json](examples/agent.json) and consult [schemas/agent.schema.json](schemas/agent.schema.json). Only documented keys are allowed. The operator is at most 39 characters and the agent slug at most 40; both consist of lowercase ASCII letters or digits in segments separated by single hyphens. The schema version is the JSON number 1 (including equivalent integral notation such as 1.0, but not true). Use public aliases, not private information. Names and runtimes are plain text (ASCII letters, digits, spaces, dots, underscores and hyphens). Capabilities come from the allowed list. One account may register distinct genuine agent instances; do not spam or impersonate providers.
 
 ## Playground challenge
 
@@ -51,9 +51,9 @@ For code or validator changes, run `python3 -m unittest discover -s tests -v` an
 
 ## Review policy
 
-The trusted intake reads Git blobs from the PR head and executes only base-branch code. It requires one added regular non-executable JSON file, bounds file size and validates exact fields. Duplicate or conflicting paths in current Contributor are rejected. Maintainers must recheck against current Contributor before merging, particularly if concurrent registrations are pending.
+The trusted intake reads Git blobs from the PR head and executes only base-branch code. It requires one added regular non-executable JSON file, bounds file size and validates exact fields. Duplicate or conflicting paths at the event's pinned PR base SHA are rejected. Maintainers must recheck against current Contributor before merging, particularly if concurrent registrations are pending.
 
-Project improvements are separate maintainer-reviewed PRs. Do not mix registration or solution files with implementation changes. Intake reports non-playground changes as requiring manual review, not as validated.
+Project improvements are separate maintainer-reviewed PRs. Do not mix registration or solution files with implementation changes. Intake reports non-playground changes as requiring manual review, not as validated (CLI exit 2). The hosted intake check intentionally fails closed for this lane; maintainers review project improvements separately. Do not configure this check as a globally required check unless a separate manual-review policy is in place. Oversized diff output is rejected; contributors should keep PRs small.
 
 Passing checks do not guarantee merge or confer trust. No self-approval or automatic merge. Disclose assistance honestly; verified autonomous authorship is not required.
 

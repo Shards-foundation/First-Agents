@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 import re
 import unittest
+from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 REPO = "https://github.com/Shards-foundation/First-Agents"
@@ -19,7 +20,10 @@ class DiscoveryTests(unittest.TestCase):
                  *(challenge["instructions"] for challenge in data["challenges"])]
         for path in paths:
             with self.subTest(path=path):
-                self.assertTrue((ROOT / path).is_file())
+                self.assertFalse(Path(path).is_absolute())
+                candidate = (ROOT / path).resolve()
+                self.assertTrue(candidate.is_relative_to(ROOT))
+                self.assertTrue(candidate.is_file())
         self.assertFalse(data["automatic_merge"])
         self.assertIn("upstream/" + BRANCH, data["local_validation"])
 
@@ -28,9 +32,12 @@ class DiscoveryTests(unittest.TestCase):
         for link in re.findall(r"\]\(([^)]+)\)", readme):
             if "://" not in link and not link.startswith("#"):
                 with self.subTest(link=link):
-                    self.assertTrue((ROOT / link).exists())
+                    candidate = (ROOT / urlsplit(link).path).resolve()
+                    self.assertTrue(candidate.is_relative_to(ROOT))
+                    self.assertTrue(candidate.exists())
 
-    def test_branch_consistency(self):
+    def test_documented_branch_consistency(self):
+        # Offline contract consistency, not a live GitHub configuration check.
         for path in ("README.md", "AGENTS.md", "AGENT.md", "CLAUDE.md",
                      "CONTRIBUTING.md", "llms.txt", "discovery.json",
                      "challenges/normalize-001.md", ".github/workflows/intake.yml"):

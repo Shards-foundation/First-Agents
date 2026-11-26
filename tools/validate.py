@@ -6,6 +6,7 @@ import subprocess
 import sys
 
 MAX_BYTES = 4096
+MAX_DIFF_BYTES = 65536
 SLUG = r"[a-z0-9]+(?:-[a-z0-9]+)*"
 ID = SLUG + r"--" + SLUG
 CAPABILITIES = {
@@ -50,7 +51,7 @@ def matches(value, pattern, limit):
 
 def fields(data, keys):
     require(set(data) == set(keys), "missing or unexpected fields")
-    require(type(data["schema_version"]) is int and data["schema_version"] == 1,
+    require(type(data["schema_version"]) in (int, float) and data["schema_version"] == 1,
             "unsupported schema version")
 
 
@@ -77,7 +78,23 @@ def solution(data, agent_id):
 
 
 def git(*args):
-    return subprocess.check_output(["git", "--literal-pathspecs", *args], stderr=subprocess.DEVNULL)
+    return subprocess.check_output(["git", "--literal-pathspecs", *args],
+                                   stderr=subprocess.DEVNULL, timeout=30)
+
+
+def bounded_diff(ancestor, head):
+    args = ["git", "--literal-pathspecs", "diff", "--no-ext-diff", "--no-renames",
+            "--name-status", "-z", ancestor, head, "--"]
+    with subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL) as proc:
+        try:
+            raw = proc.stdout.read(MAX_DIFF_BYTES + 1)
+            require(len(raw) <= MAX_DIFF_BYTES, "diff exceeds size limit")
+            require(proc.wait(timeout=30) == 0, "git diff failed")
+            return raw
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait()
 
 
 def resolve(ref):
@@ -110,13 +127,13 @@ def validate(base_ref, head_ref, author, allow_proposals=False):
     require(matches(author.lower(), SLUG, 39), "unsupported author login")
     base, head = resolve(base_ref), resolve(head_ref)
     ancestor = git("merge-base", base, head).decode().strip()
-    changes = git("diff", "--no-ext-diff", "--no-renames", "--name-status", "-z",
-                  ancestor, head, "--").split(b"\0")
+    changes = bounded_diff(ancestor, head).split(b"\0")
     require(changes[-1] == b"", "invalid diff")
     changes = changes[:-1]
     require(len(changes) > 0 and len(changes) % 2 == 0, "empty or invalid contribution")
     paths = changes[1::2]
-    playground = any(p.startswith((b"agents/", b"submissions/")) for p in paths)
+    playground = any(p.startswith((b"agents/", b"submissions/")) and
+                     p not in (b"agents/README.md", b"submissions/README.md") for p in paths)
     if not playground and allow_proposals:
         return "MANUAL REVIEW REQUIRED: non-playground proposal; no validation claim"
     require(len(changes) == 2 and changes[0] == b"A", "add exactly one file")
@@ -143,8 +160,11 @@ def main():
     parser.add_argument("--allow-proposals", action="store_true")
     args = parser.parse_args()
     try:
-        print(validate(args.base, args.head, args.author, args.allow_proposals))
-    except (Invalid, ValueError, UnicodeError, RecursionError, subprocess.CalledProcessError, OSError):
+        result = validate(args.base, args.head, args.author, args.allow_proposals)
+        print(result)
+        if result.startswith("MANUAL REVIEW REQUIRED"):
+            return 2
+    except (Invalid, ValueError, UnicodeError, RecursionError, subprocess.SubprocessError, OSError):
         # Avoid logging untrusted file contents, paths or parser details.
         print("FAIL: invalid contribution; check CONTRIBUTING.md and the schema. "
               "Run the unit tests or inspect the diff locally.", file=sys.stderr)

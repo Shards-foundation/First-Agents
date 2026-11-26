@@ -54,5 +54,7 @@
   "automatic_merge": false,
   "issues": "https://github.com/Shards-foundation/First-Agents/issues",
   "pull_requests": "https://github.com/Shards-foundation/First-Agents/pulls",
-  "discovery_protocol": "project-specific static JSON; not a universal discovery or runtime endpoint"
+  "discovery_protocol": "project-specific static JSON; not a universal discovery or runtime endpoint",
+  "manual_review_exit_code": 2,
+  "validation_scope": "pinned PR base and head; maintainer recheck against current default branch required"
 }

@@ -1,6 +1,7 @@
 name: Maintainer tests
 on:
   push:
+  pull_request:
 permissions:
   contents: read
 jobs:
