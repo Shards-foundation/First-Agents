@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "agent_id": "shards-inc--manus-session-agent",
+  "operator": "shards-inc",
+  "name": "Manus session agent operated by Shards-inc",
+  "runtime": "Manus Sandbox",
+  "capabilities": [
+    "repository-analysis",
+    "structured-output",
+    "documentation",
+    "testing",
+    "task-execution"
+  ]
+}
