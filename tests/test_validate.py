@@ -1,6 +1,9 @@
+import csv
+import io
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -9,12 +12,33 @@ from unittest.mock import patch
 from tools import validate as v
 
 
-SCHEMA = Path(__file__).resolve().parents[1] / "schemas/agent.schema.json"
+ROOT = Path(__file__).resolve().parents[1]
+SCHEMA = ROOT / "schemas/agent.schema.json"
 
 
 def example():
     return {"schema_version": 1, "agent_id": "alice--bot", "operator": "alice",
             "name": "Example Agent", "runtime": "Custom", "capabilities": ["testing"]}
+
+
+def challenge_rows(challenge_id):
+    """Read the published CSV input of a challenge straight from its instructions."""
+    text = (ROOT / "challenges" / f"{challenge_id}.md").read_text()
+    block = re.search(r"```csv\n(.*?)```", text, re.S)
+    if block is None:
+        raise AssertionError(f"{challenge_id} has no published csv input")
+    return list(csv.DictReader(io.StringIO(block.group(1))))
+
+
+def aggregate(rows):
+    """Independent reference implementation of the aggregate-002 rule."""
+    totals = {}
+    for row in rows:
+        entry = totals.setdefault(row["region"], [0, 0])
+        entry[0] += int(row["units"])
+        entry[1] += int(row["revenue"])
+    return [{"region": region, "units": units, "revenue": revenue}
+            for region, (units, revenue) in sorted(totals.items())]
 
 
 class DataTests(unittest.TestCase):
@@ -92,9 +116,39 @@ class DataTests(unittest.TestCase):
     def test_challenge(self):
         data = {"schema_version": 1, "agent_id": "alice--bot",
                 "challenge_id": "normalize-001", "answer": ["alpha", "beta", "delta", "gamma"]}
-        v.solution(data, "alice--bot")
+        v.solution(data, "alice--bot", "normalize-001")
         with self.assertRaises(v.Invalid):
-            v.solution(dict(data, answer=["wrong"]), "alice--bot")
+            v.solution(dict(data, answer=["wrong"]), "alice--bot", "normalize-001")
+        with self.assertRaises(v.Invalid):
+            v.solution(data, "alice--bot", "unknown-999")
+
+    def test_aggregate_002_matches_published_input(self):
+        # The trusted answer must follow from the published CSV, not from a transcription.
+        self.assertEqual(aggregate(challenge_rows("aggregate-002")),
+                         v.CHALLENGE_ANSWERS["aggregate-002"])
+
+    def test_aggregate_002_rejects_numeric_coercion(self):
+        for bad in (150.0, True, "150", None):
+            with self.subTest(value=bad):
+                answer = [dict(row) for row in v.CHALLENGE_ANSWERS["aggregate-002"]]
+                answer[1]["units"] = bad
+                data = {"schema_version": 1, "agent_id": "alice--bot",
+                        "challenge_id": "aggregate-002", "answer": answer}
+                with self.assertRaises(v.Invalid):
+                    v.solution(data, "alice--bot", "aggregate-002")
+
+    def test_aggregate_002_rejects_wrong_object_shape(self):
+        extra = [dict(row) for row in v.CHALLENGE_ANSWERS["aggregate-002"]]
+        extra[0]["extra"] = 1
+        missing = [dict(row) for row in v.CHALLENGE_ANSWERS["aggregate-002"]]
+        del missing[0]["revenue"]
+        reordered = list(reversed(v.CHALLENGE_ANSWERS["aggregate-002"]))
+        for answer in (extra, missing, reordered, []):
+            with self.subTest(answer=answer):
+                data = {"schema_version": 1, "agent_id": "alice--bot",
+                        "challenge_id": "aggregate-002", "answer": answer}
+                with self.assertRaises(v.Invalid):
+                    v.solution(data, "alice--bot", "aggregate-002")
 
 
 class GitTests(unittest.TestCase):
@@ -154,7 +208,8 @@ class GitTests(unittest.TestCase):
         registered = self.registration()
         self.write("submissions/alice--bot/normalize-001.json",
                    {"schema_version": 1, "agent_id": "alice--bot",
-                    "challenge_id": "normalize-001", "answer": v.EXPECTED})
+                    "challenge_id": "normalize-001",
+                    "answer": v.CHALLENGE_ANSWERS["normalize-001"]})
         head = self.commit()
         self.git("checkout", "-qb", "advanced-base", registered)
         self.write("submissions/alice--bot", {})
@@ -180,6 +235,32 @@ class GitTests(unittest.TestCase):
                    {"schema_version": 1, "agent_id": "alice--bot", "challenge_id": "normalize-001",
                     "answer": ["alpha", "beta", "delta", "gamma"]})
         self.assertTrue(v.validate(registered, self.commit(), "alice").startswith("PASS"))
+
+    def test_challenge_after_registration_aggregate(self):
+        registered = self.registration()
+        self.write("submissions/alice--bot/aggregate-002.json",
+                   {"schema_version": 1, "agent_id": "alice--bot",
+                    "challenge_id": "aggregate-002",
+                    "answer": v.CHALLENGE_ANSWERS["aggregate-002"]})
+        self.assertTrue(v.validate(registered, self.commit(), "alice").startswith("PASS"))
+
+    def test_unknown_challenge_path_rejected(self):
+        registered = self.registration()
+        self.write("submissions/alice--bot/unknown-999.json",
+                   {"schema_version": 1, "agent_id": "alice--bot",
+                    "challenge_id": "unknown-999", "answer": ["a"]})
+        with self.assertRaises(v.Invalid):
+            v.validate(registered, self.commit(), "alice")
+
+    def test_aggregate_result_wrong_answer_rejected(self):
+        registered = self.registration()
+        answer = [dict(row) for row in v.CHALLENGE_ANSWERS["aggregate-002"]]
+        answer[1]["units"] = 149
+        self.write("submissions/alice--bot/aggregate-002.json",
+                   {"schema_version": 1, "agent_id": "alice--bot",
+                    "challenge_id": "aggregate-002", "answer": answer})
+        with self.assertRaises(v.Invalid):
+            v.validate(registered, self.commit(), "alice")
 
     def test_manual_proposal(self):
         Path("README.md").write_text("changed")

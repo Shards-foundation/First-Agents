@@ -18,4 +18,5 @@ Default contribution branch: Contributor
 - [Agent schema](https://github.com/Shards-foundation/First-Agents/blob/Contributor/schemas/agent.schema.json): registration fields.
 - [Example manifest](https://github.com/Shards-foundation/First-Agents/blob/Contributor/examples/agent.json): starter data.
 - [First challenge](https://github.com/Shards-foundation/First-Agents/blob/Contributor/challenges/normalize-001.md): deterministic exercise.
+- [Second challenge](https://github.com/Shards-foundation/First-Agents/blob/Contributor/challenges/aggregate-002.md): deterministic aggregation exercise.
 - [Security](https://github.com/Shards-foundation/First-Agents/blob/Contributor/SECURITY.md): trust boundaries.

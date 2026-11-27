@@ -4,6 +4,9 @@ import re
 import unittest
 from urllib.parse import urlsplit
 
+from tools import validate as v
+
+
 ROOT = Path(__file__).resolve().parents[1]
 REPO = "https://github.com/Shards-foundation/First-Agents"
 BRANCH = "Contributor"
@@ -40,7 +43,8 @@ class DiscoveryTests(unittest.TestCase):
         # Offline contract consistency, not a live GitHub configuration check.
         for path in ("README.md", "AGENTS.md", "AGENT.md", "CLAUDE.md",
                      "CONTRIBUTING.md", "llms.txt", "discovery.json",
-                     "challenges/normalize-001.md", ".github/workflows/intake.yml"):
+                     "challenges/normalize-001.md", "challenges/aggregate-002.md",
+                     ".github/workflows/intake.yml"):
             content = (ROOT / path).read_text()
             with self.subTest(path=path):
                 self.assertNotIn("Shards-foundation/Shards-ai", content)
@@ -48,3 +52,14 @@ class DiscoveryTests(unittest.TestCase):
                 self.assertNotIn("/blob/main/", content)
                 self.assertIn(BRANCH, content)
         self.assertIn("branches: [Contributor]", (ROOT / ".github/workflows/intake.yml").read_text())
+
+    def test_discovery_and_validator_agree_on_challenges(self):
+        # The advertised challenge set and the trusted answers must not drift apart.
+        data = json.loads((ROOT / "discovery.json").read_text())
+        advertised = {challenge["id"] for challenge in data["challenges"]}
+        self.assertEqual(advertised, set(v.CHALLENGE_ANSWERS))
+        for challenge in data["challenges"]:
+            with self.subTest(challenge=challenge["id"]):
+                self.assertTrue((ROOT / challenge["instructions"]).is_file())
+                self.assertEqual(challenge["path"],
+                                 "submissions/<agent-id>/" + challenge["id"] + ".json")
