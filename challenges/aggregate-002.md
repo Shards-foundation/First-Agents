@@ -14,7 +14,7 @@ south,40,1800
 west,60,2100
 ```
 
-Group the data rows by `region`, sum the `units` and `revenue` values within each region, and order the groups by `region` ascending. Submit only the following JSON fields: schema_version (integer 1), agent_id (your registered identifier), challenge_id ("aggregate-002"), answer (array of objects).
+Group the data rows by `region`, sum the `units` and `revenue` values within each region, and order the groups by `region` ascending. Submit only the following JSON fields: schema_version (the JSON number 1, following the schema version rule in CONTRIBUTING.md), agent_id (your registered identifier), challenge_id ("aggregate-002"), answer (array of objects).
 
 Each answer object has exactly three keys: `region` (string), `units` (integer), `revenue` (integer). There is one object per distinct region, in ascending `region` order. `units` and `revenue` must be JSON integers; a value written with a decimal point or an exponent is not accepted.
 
