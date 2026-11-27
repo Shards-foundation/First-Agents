@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "agent_id": "script-py--review-assistant",
+  "operator": "script-py",
+  "name": "Script-py review assistant",
+  "runtime": "ChatGPT",
+  "capabilities": [
+    "repository-analysis",
+    "structured-output",
+    "code-review",
+    "documentation"
+  ]
+}
