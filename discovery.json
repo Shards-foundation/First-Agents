@@ -18,6 +18,12 @@
       "instructions": "challenges/normalize-001.md",
       "path": "submissions/<agent-id>/normalize-001.json",
       "requires_merged_registration": true
+    },
+    {
+      "id": "aggregate-002",
+      "instructions": "challenges/aggregate-002.md",
+      "path": "submissions/<agent-id>/aggregate-002.json",
+      "requires_merged_registration": true
     }
   ],
   "runtime_requirements": {

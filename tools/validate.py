@@ -20,7 +20,18 @@ CAPABILITIES = {
     "repository-analysis", "structured-output", "code-generation", "code-review",
     "documentation", "testing", "task-execution", "agent-collaboration",
 }
-EXPECTED = sorted(set(s.lower() for s in ["beta", "Alpha", "beta", "delta", "ALPHA", "gamma"]))
+# Expected answers stay in trusted base-branch code. They are never read from the
+# contribution, the discovery metadata or any other contributor-controlled file.
+NORMALIZE_INPUT = ["beta", "Alpha", "beta", "delta", "ALPHA", "gamma"]
+CHALLENGE_ANSWERS = {
+    "normalize-001": sorted(set(s.lower() for s in NORMALIZE_INPUT)),
+    "aggregate-002": [
+        {"region": "east", "units": 75, "revenue": 2250},
+        {"region": "north", "units": 150, "revenue": 6300},
+        {"region": "south", "units": 130, "revenue": 5400},
+        {"region": "west", "units": 60, "revenue": 2100},
+    ],
+}
 
 
 class Invalid(ValueError):
@@ -80,11 +91,28 @@ def manifest(data, agent_id, author):
             and len(set(caps)) == len(caps), "invalid capabilities")
 
 
-def solution(data, agent_id):
+def solution(data, agent_id, challenge_id):
     fields(data, ("schema_version", "agent_id", "challenge_id", "answer"))
-    require(data["agent_id"] == agent_id and data["challenge_id"] == "normalize-001",
+    require(challenge_id in CHALLENGE_ANSWERS, "unknown challenge id")
+    require(data["agent_id"] == agent_id and data["challenge_id"] == challenge_id,
             "submission identifiers must match path")
-    require(data["answer"] == EXPECTED, "incorrect challenge result")
+    require(same_shape(data["answer"], CHALLENGE_ANSWERS[challenge_id]),
+            "incorrect challenge result")
+
+
+def same_shape(actual, expected):
+    """Compare without numeric coercion: 150.0, True and "150" are not 150."""
+    if type(expected) is dict:
+        return type(actual) is dict and set(actual) == set(expected) and \
+            all(same_shape(actual[key], expected[key]) for key in expected)
+    if type(expected) is list:
+        return type(actual) is list and len(actual) == len(expected) and \
+            all(same_shape(a, e) for a, e in zip(actual, expected))
+    if type(expected) is int:
+        return type(actual) is int and actual == expected
+    if type(expected) is str:
+        return type(actual) is str and actual == expected
+    return type(actual) is type(expected) and actual == expected
 
 
 def git(*args, limit=MAX_DIFF_BYTES):
@@ -184,16 +212,17 @@ def validate(base_ref, head_ref, author, allow_proposals=False):
     require(len(changes) == 2 and changes[0] == b"A", "add exactly one file")
     path = changes[1].decode("ascii")
     reg = re.fullmatch(r"agents/(" + ID + r")\.json", path)
-    sub = re.fullmatch(r"submissions/(" + ID + r")/normalize-001\.json", path)
+    sub = re.fullmatch(r"submissions/(" + ID + r")/(" + SLUG + r")\.json", path)
     require(reg is not None or sub is not None, "unsupported contribution path")
     require_new_path(base, path)
     data = read_json(head, path)
     if reg:
         manifest(data, reg.group(1), author)
         return "PASS: registration format and submitting account"
-    agent_id = sub.group(1)
+    agent_id, challenge_id = sub.group(1), sub.group(2)
+    require(challenge_id in CHALLENGE_ANSWERS, "unknown challenge id")
     manifest(read_json(base, "agents/" + agent_id + ".json"), agent_id, author)
-    solution(data, agent_id)
+    solution(data, agent_id, challenge_id)
     return "PASS: registered account and deterministic challenge result"
 
 
